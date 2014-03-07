@@ -1,0 +1,185 @@
+<html>
+
+<script src="socket.io/socket.io.js"></script>
+<script>
+  var socket = io.connect('https://192.168.1.142:8080');
+  socket.on('connect', function () {
+  	 getUserName();
+
+     socket.on('ready', function () {
+       console.log('Connected !');
+     });
+
+	});
+
+  socket.on('error', function (reason) {
+	alert('Some error occured at server ');
+
+  });
+
+// Duplicate users found.
+	 socket.on('duplicateuser', function () {
+	   console.log('Invalid or User with same name already exists !');
+	   alert('Invalid username or User with same username already exists. Please try again');
+	   getUserName();
+	 });
+
+// Got a list of active users
+	 socket.on('activeusers',function(users){
+			console.log('server sent active uses : ' + users);
+			userarr = JSON.parse(users);
+			removeall();
+			for(i=0;i<userarr.length;i++){
+				if(userarr[i] == '')
+					continue;
+				addNewListItem(userarr[i]);
+			}
+	 });
+
+// Remove the user from the list
+	 socket.on('removeuser',function(username){
+			console.log('server sent disconnected uses : ' + username);
+			if(username != ''){
+				removeuser(username);
+			}
+	 });
+
+	 socket.on('chat',function( message, fromuser){
+		console.log(fromuser + ' sent the following message : ' + message);
+		appendToChat(fromuser,message);
+	 });
+
+// We cannot find the room for the user
+     socket.on('update',function(){
+     	console.log('Please connect to a room first!');
+     	return;
+     });
+
+
+function getUserName(){
+	var username = prompt('What is your nickname?');
+    socket.emit('set nickname', username );
+    var nameid = document.getElementById("name");
+    nameid.value = username;
+}
+
+// Send message to the user/room
+function sendmsg(){
+
+	var selActiveUsers=document.getElementById('activeusers');
+    var indx = selActiveUsers.selectedIndex;
+
+	var toUser = null;
+    if(indx == -1){
+    	console.log('Broadcasting to all');
+    }else{
+		var y = document.getElementById("activeusers").options;
+		toUser = y[indx].text;
+	}
+	var msg = document.getElementById("msg").value;
+	socket.emit('msg',msg,toUser);
+
+	appendToChat("You",msg);
+
+}
+
+// Adds to the existing chat
+function appendToChat(user , message){
+
+	var previd = document.getElementById("prevchats");
+	var prev = previd.value;
+
+	message = user + ': ' + message;
+	prev += message;
+	prev += "\n";
+
+	previd.value = prev;
+}
+
+
+function removeall(){
+
+	var selActiveUsers=document.getElementById('activeusers');
+	for(var x=0;x<selActiveUsers.options.length;x++){
+		selActiveUsers.remove(x);
+	}
+}
+
+
+function removeuser(username){
+
+	var selActiveUsers=document.getElementById('activeusers');
+	for(var x=0;x<selActiveUsers.options.length;x++){
+			if(selActiveUsers.options[x].value==username || selActiveUsers.options[x].text==username){
+				selActiveUsers.remove(x);
+				return true;
+			}
+	}
+	return false;
+}
+
+// add user to the list
+function addNewListItem(username){
+	console.log('adding user == ' + username);
+	var selActiveUsers=document.getElementById('activeusers');
+
+	if(username==''){
+	console.log('invalid user == ' + username);
+		return false;
+	}
+
+	if(isOptionAlreadyExist(selActiveUsers,username)){
+		console.log('Duplicate username');
+		return false;
+	}
+
+	var selectBoxOption = document.createElement("option");
+	selectBoxOption.value = username;
+	selectBoxOption.text = username;
+	selActiveUsers.add(selectBoxOption, null);
+	return true;
+
+}
+function isOptionAlreadyExist(listBox,value){
+	var exists=false;
+	for(var x=0;x<listBox.options.length;x++){
+		if(listBox.options[x].value==value || listBox.options[x].text==value){
+			exists=true;
+			break;
+		}
+	}
+	return exists;
+}
+
+</script>
+
+<body onload="removeall()">
+
+<h1> This is a Websocket chat client </h1>
+<br><br><br>
+
+Enter your name : <input type="text" id="name"/>
+
+<br>
+
+Enter your message : <input type="text" id="msg"/>
+
+<br>
+
+<br>
+<br>
+Current Active Users:
+<select id="activeusers"  size="6" >
+</select>
+<br>Note: Not selecting a user will broadcast the message to everyone.
+
+<br><br>
+<input type=button onclick="sendmsg()" value="Send Message"/>
+
+
+<br><br>
+Sent Messages:
+<textarea rows="4" cols="50" id="prevchats" readonly></textarea>
+
+</body>
+</html>
